@@ -130,6 +130,8 @@ docker compose exec api python -m app.ingest
 docker compose exec api python -m evals.retrieval
 ```
 
+A GitHub Actions workflow builds the API image on every push to `main` and publishes it to GitHub Packages (linux/amd64): `docker pull ghcr.io/priyamkeshri/support-assistant:latest`
+
 ### API
 
 ```bash
