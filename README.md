@@ -1,10 +1,12 @@
 # Agentic Support Assistant
 
-An IT help desk assistant for a company's policy documents. Phase 1 is the retrieval core: it reads policy PDFs, indexes them in **PostgreSQL + pgvector**, finds the right passage with **hybrid search (keyword + semantic) and cross-encoder reranking**, answers with citations, and measures all of it against a labelled question set.
+An IT help desk assistant for a company's policy documents. Phase 1 is the retrieval core: it reads policy PDFs, indexes them in **PostgreSQL + pgvector**, finds the right passage with **hybrid search (keyword + semantic) and cross-encoder reranking**, answers with citations in a streaming chat page, and measures all of it against a labelled question set.
 
 Later phases add the agent itself: tools for looking up and changing tickets, served over MCP, with human approval before risky actions (see [Roadmap](#roadmap)).
 
 > The company, Kestrel Analytics, and its nine IT policies are fictional, written for this project.
+
+![The chat page: a cited answer with its policy excerpt open, and a question the policies don't cover](docs/chat.jpg)
 
 ## Results
 
@@ -80,6 +82,8 @@ flowchart LR
 
 **Answers** (`app/answer.py`). The top 5 reranked chunks go to any OpenAI-compatible model (OpenAI, Azure OpenAI, Groq or a local Ollama model) with instructions to cite every statement as `[n]`, and to reply with a fixed "couldn't find this" sentence when the excerpts don't answer the question.
 
+**Chat page** (`app/static/index.html`). One HTML file with no build step, served at `/`. It streams the answer from `/ask/stream` as the model writes it, so a local model's 5–15 seconds don't feel like a frozen screen. Each `[n]` becomes a chip that opens the policy excerpt it points to. Answers the policies don't cover get a distinct style.
+
 ## Evaluation
 
 `evals/questions.jsonl` holds 84 questions about the policies: 78 answerable, each labelled with the section(s) that answer it (e.g. `IT-OPS-003#4`) and a reference answer, plus 6 that the policies can't answer. Each question has a type, so the results show where each retriever is strong:
@@ -107,7 +111,7 @@ make db         # Postgres 17 + pgvector on localhost:5433
 make ingest     # parse, chunk, embed and store the 9 policy PDFs
 make test       # unit + integration tests
 make eval       # retrieval comparison table
-make api        # http://localhost:8000/docs
+make api        # chat at http://localhost:8000, API docs at /docs
 ```
 
 To get answers as well as search results, copy `.env.example` to `.env` and set `LLM_BASE_URL` and `LLM_MODEL`. With [Ollama](https://ollama.com) running locally:
@@ -136,7 +140,9 @@ curl -s localhost:8000/ask -H 'content-type: application/json' \
   -d '{"question": "I lost my laptop at the airport. What should I do?"}'
 ```
 
-`/search` takes `mode` = `keyword`, `semantic`, `hybrid` or `rerank` (the default). `/ask` returns the answer, the cited sections with page numbers, retrieval and generation time, token counts and cost.
+`/search` takes `mode` = `keyword`, `semantic`, `hybrid` or `rerank` (the default). `/ask` returns the answer, the cited sections (each with the `n` its `[n]` marker uses) and their page numbers, retrieval and generation time, token counts and cost.
+
+`/ask/stream` takes the same request and replies with server-sent events: `sources` (the numbered excerpts), a `token` event for each piece of the answer as it is written, then `done` with the cited numbers, timing and token counts. If the model fails mid-answer, an `error` event arrives instead of `done`.
 
 ## Project layout
 
@@ -147,8 +153,9 @@ app/
   schema.sql      documents + chunks, GIN and HNSW indexes
   ingest.py       CLI: parse, chunk, embed, upsert
   search.py       keyword / semantic / hybrid (RRF in SQL) / rerank
-  answer.py       grounded answers with [n] citations
-  main.py         FastAPI: /health, /search, /ask
+  answer.py       grounded answers with [n] citations, whole or streamed
+  main.py         FastAPI: /, /health, /search, /ask, /ask/stream
+  static/         the chat page (one HTML file, no build step)
 evals/
   questions.jsonl labelled question set
   metrics.py      Hit@k, Recall@k, MRR, nDCG, percentiles

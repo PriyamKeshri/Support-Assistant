@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kestrel IT Help Desk</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232f5bd3'/%3E%3Ctext x='16' y='22.5' font-family='Arial' font-size='18' font-weight='700' fill='white' text-anchor='middle'%3EK%3C/text%3E%3C/svg%3E">
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f6f7f9;
+    --surface: #ffffff;
+    --text: #1c2230;
+    --muted: #586174;
+    --border: #dde1e8;
+    --accent: #2f5bd3;
+    --on-accent: #ffffff;
+    --cite-bg: #e3e9fb;
+    --cite-text: #1f3f99;
+    --notice-bg: #fff6e0;
+    --notice-border: #f0d68f;
+    --error-bg: #fdecec;
+    --error-border: #f2b8b8;
+    --highlight: #fff1a8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12151b;
+      --surface: #1b1f27;
+      --text: #e6e9ef;
+      --muted: #9aa3b2;
+      --border: #2e343f;
+      --accent: #3d63d6;
+      --on-accent: #ffffff;
+      --cite-bg: #26324f;
+      --cite-text: #c3d0ff;
+      --notice-bg: #352d12;
+      --notice-border: #6b5a1f;
+      --error-bg: #3a1d1d;
+      --error-border: #6e3434;
+      --highlight: #4d4520;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  button, textarea { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .visually-hidden {
+    position: absolute; width: 1px; height: 1px; overflow: hidden;
+    clip: rect(0 0 0 0); white-space: nowrap;
+  }
+
+  .app { max-width: 780px; margin: 0 auto; min-height: 100vh; display: flex; flex-direction: column; padding: 0 16px; }
+
+  .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 0 14px; border-bottom: 1px solid var(--border); }
+  .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .logo { flex: none; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 9px; background: var(--accent); color: var(--on-accent); font-weight: 700; }
+  .top h1 { margin: 0; font-size: 17px; }
+  .status { margin: 1px 0 0; color: var(--muted); font-size: 13px; }
+  .docs-link { flex: none; color: var(--muted); font-size: 13px; }
+
+  main { flex: 1; padding: 20px 0 8px; }
+
+  .welcome { margin: 6vh 0 24px; }
+  .welcome h2 { margin: 0 0 6px; font-size: 22px; }
+  .welcome p { margin: 0 0 18px; color: var(--muted); }
+  .examples { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .example {
+    text-align: left; padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px;
+    background: var(--surface); cursor: pointer;
+  }
+  .example:hover { border-color: var(--accent); }
+
+  .log { display: flex; flex-direction: column; gap: 16px; }
+  .msg.user { align-self: flex-end; max-width: 85%; }
+  .msg.user .bubble {
+    padding: 10px 14px; border-radius: 16px 16px 4px 16px;
+    background: var(--accent); color: var(--on-accent); white-space: pre-wrap; overflow-wrap: anywhere;
+  }
+  .msg.bot { padding: 14px 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+  .msg.bot.abstained { background: var(--notice-bg); border-color: var(--notice-border); }
+  .msg.bot.error { background: var(--error-bg); border-color: var(--error-border); }
+
+  .answer { overflow-wrap: anywhere; }
+  .answer p { margin: 0 0 8px; }
+  .answer p:last-child { margin-bottom: 0; }
+  .answer ul, .answer ol { margin: 0 0 8px; padding-left: 22px; }
+  .working { color: var(--muted); }
+  .dots::after { content: ""; animation: dots 1.2s steps(4) infinite; }
+  @keyframes dots { 0% { content: ""; } 25% { content: "."; } 50% { content: ".."; } 75% { content: "..."; } }
+
+  .cite {
+    position: relative; top: -0.35em; min-width: 18px; height: 18px; margin: 0 1px; padding: 0 5px;
+    border: 0; border-radius: 9px; background: var(--cite-bg); color: var(--cite-text);
+    font-size: 11px; font-weight: 600; line-height: 18px; cursor: pointer;
+  }
+
+  .sources { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
+  .sources h3 { margin: 0 0 6px; color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
+  .sources ol { margin: 0; padding: 0; list-style: none; }
+  .sources li { border-radius: 8px; }
+  .sources summary { display: flex; align-items: baseline; gap: 8px; padding: 4px 6px; border-radius: 8px; cursor: pointer; list-style: none; }
+  .sources summary::-webkit-details-marker { display: none; }
+  .sources summary:hover { background: var(--bg); }
+  .sources .num {
+    flex: none; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px;
+    background: var(--cite-bg); color: var(--cite-text); font-size: 11px; font-weight: 600; line-height: 18px; text-align: center;
+  }
+  .sources .where { flex: 1; min-width: 0; font-size: 14px; }
+  .sources .page { flex: none; color: var(--muted); font-size: 12px; }
+  .excerpt {
+    margin: 4px 6px 8px 32px; padding-left: 10px; border-left: 3px solid var(--border);
+    color: var(--muted); font-size: 13.5px; white-space: pre-line;
+  }
+  .flash { animation: flash 1.6s ease-out; }
+  @keyframes flash { from { background: var(--highlight); } to { background: transparent; } }
+
+  .meta { margin: 10px 0 0; color: var(--muted); font-size: 12px; }
+
+  .composer { position: sticky; bottom: 0; padding: 12px 0 16px; background: linear-gradient(to bottom, transparent, var(--bg) 14px); }
+  .input-row { display: flex; gap: 8px; align-items: flex-end; }
+  textarea {
+    flex: 1; min-height: 46px; max-height: 160px; padding: 11px 14px; resize: none; overflow-y: hidden;
+    border: 1px solid var(--border); border-radius: 12px; background: var(--surface);
+  }
+  textarea:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--cite-bg); }
+  .send {
+    height: 46px; padding: 0 18px; border: 0; border-radius: 12px;
+    background: var(--accent); color: var(--on-accent); font-weight: 600; cursor: pointer;
+  }
+  .send:disabled { opacity: 0.5; cursor: default; }
+  .hint { margin: 8px 2px 0; color: var(--muted); font-size: 12px; }
+
+  @media (max-width: 560px) {
+    .examples { grid-template-columns: 1fr; }
+    .msg.user { max-width: 92%; }
+    .sources .page { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .dots::after { animation: none; content: "..."; }
+    .flash { animation: none; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">K</span>
+      <div>
+        <h1>Kestrel IT Help Desk</h1>
+        <p class="status" id="status">Connecting…</p>
+      </div>
+    </div>
+    <a class="docs-link" href="/docs">API docs</a>
+  </header>
+
+  <main>
+    <section class="welcome" id="welcome">
+      <h2>Ask about the IT policies</h2>
+      <p>Answers come only from Kestrel's IT policies, and show the sections they're based on. Kestrel Analytics is a fictional company.</p>
+      <div class="examples">
+        <button type="button" class="example">I lost my laptop at the airport. What should I do?</button>
+        <button type="button" class="example">What does error VPN-809 mean?</button>
+        <button type="button" class="example">Can I paste customer data into ChatGPT?</button>
+        <button type="button" class="example">How do I get admin rights on my Mac?</button>
+      </div>
+    </section>
+    <div class="log" id="log" role="log" aria-live="polite" aria-label="Conversation"></div>
+  </main>
+
+  <form class="composer" id="composer">
+    <label class="visually-hidden" for="question">Your question</label>
+    <div class="input-row">
+      <textarea id="question" rows="1" maxlength="500" placeholder="Ask about the IT policies…" required></textarea>
+      <button class="send" id="send" type="submit">Send</button>
+    </div>
+    <p class="hint">Each question is answered on its own, so follow-ups don't see earlier messages yet. Enter sends; Shift+Enter adds a line.</p>
+  </form>
+</div>
+
+<script>
+const log = document.getElementById("log");
+const form = document.getElementById("composer");
+const input = document.getElementById("question");
+const sendButton = document.getElementById("send");
+const welcome = document.getElementById("welcome");
+let busy = false;
+
+fetch("/health")
+  .then((res) => res.json())
+  .then((h) => {
+    document.getElementById("status").textContent =
+      `${h.documents} policies · ${h.chunks} sections indexed · ` +
+      (h.llm_model ? `model: ${h.llm_model}` : "no model configured, so answers are unavailable");
+  })
+  .catch(() => { document.getElementById("status").textContent = "Can't reach the API"; });
+
+const escapeHtml = (s) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+const seconds = (ms) => `${(ms / 1000).toFixed(1)} s`;
+
+// [2] or [1, 3] become buttons that open the matching source. Numbers with no source stay as text.
+function inline(s, sourceCount) {
+  return s
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\[(\d+(?:\s*,\s*\d+)*)\]/g, (match, group) => {
+      const numbers = group.split(",").map((n) => Number(n.trim()));
+      if (numbers.some((n) => n < 1 || n > sourceCount)) return match;
+      return numbers.map((n) => `<button type="button" class="cite" data-n="${n}" aria-label="Show source ${n}">${n}</button>`).join("");
+    });
+}
+
+// Just enough Markdown for help-desk answers: paragraphs, bullet and numbered lists, bold.
+function render(text, sourceCount) {
+  const visible = text.replace(/<think>[\s\S]*?(?:<\/think>|$)/g, "").trim();  // reasoning models think first
+  if (!visible) return '<p class="working">Writing the answer<span class="dots"></span></p>';
+  let html = "";
+  let list = null;
+  for (const line of escapeHtml(visible).split("\n").map((l) => l.trim())) {
+    const item = line.match(/^(?:[-*•]|(\d+)[.)])\s+(.*)$/);
+    const kind = item ? (item[1] ? "ol" : "ul") : null;
+    if (kind !== list) {
+      if (list) html += `</${list}>`;
+      if (kind) html += `<${kind}>`;
+      list = kind;
+    }
+    if (item) html += `<li>${inline(item[2], sourceCount)}</li>`;
+    else if (line) html += `<p>${inline(line, sourceCount)}</p>`;
+  }
+  return list ? html + `</${list}>` : html;
+}
+
+function addUserMessage(text) {
+  const el = document.createElement("div");
+  el.className = "msg user";
+  const bubble = document.createElement("div");
+  bubble.className = "bubble";
+  bubble.textContent = text;
+  el.append(bubble);
+  log.append(el);
+}
+
+function addBotMessage() {
+  const el = document.createElement("article");
+  el.className = "msg bot";
+  el.innerHTML = `
+    <div class="answer"><p class="working">Searching the policies<span class="dots"></span></p></div>
+    <section class="sources" hidden><h3>Searched</h3><ol></ol></section>
+    <p class="meta" hidden></p>`;
+  log.append(el);
+  return el;
+}
+
+function showSources(el, sources) {
+  const list = el.querySelector(".sources ol");
+  for (const s of sources) {
+    const li = document.createElement("li");
+    li.dataset.n = s.n;
+    li.innerHTML = '<details><summary><span class="num"></span><span class="where"></span><span class="page"></span></summary><p class="excerpt"></p></details>';
+    li.querySelector(".num").textContent = s.n;
+    li.querySelector(".where").textContent = `${s.doc_title} · ${s.section}`;
+    li.querySelector(".page").textContent = `${s.doc_code}, p. ${s.page}`;
+    li.querySelector(".excerpt").textContent = s.content;
+    list.append(li);
+  }
+  el.querySelector(".sources").hidden = false;
+}
+
+function finish(el, done, sourceCount) {
+  el.querySelector(".answer").innerHTML = render(done.answer, sourceCount);
+  const box = el.querySelector(".sources");
+  if (done.abstained) {
+    el.classList.add("abstained");
+    box.hidden = true;
+  } else if (done.cited.length) {
+    // Keep only the sections the answer actually relies on.
+    box.querySelector("h3").textContent = "Sources";
+    for (const li of box.querySelectorAll("li")) {
+      if (!done.cited.includes(Number(li.dataset.n))) li.remove();
+    }
+  } else {
+    box.querySelector("h3").textContent = "Sections searched";
+  }
+  const parts = [`Search ${seconds(done.retrieval_ms)}`, `answer ${seconds(done.generation_ms)}`];
+  if (done.prompt_tokens) parts.push(`${done.prompt_tokens} + ${done.completion_tokens} tokens`);
+  if (done.cost_usd > 0) parts.push(`$${done.cost_usd.toFixed(4)}`);
+  const meta = el.querySelector(".meta");
+  meta.textContent = parts.join(" · ");
+  meta.hidden = false;
+}
+
+function showError(el, message) {
+  el.classList.add("error");
+  const p = document.createElement("p");
+  p.textContent = message;
+  el.querySelector(".answer").replaceChildren(p);
+}
+
+async function errorMessage(res) {
+  try {
+    const body = await res.json();
+    if (typeof body.detail === "string") return body.detail;
+  } catch {}
+  return `The request failed (HTTP ${res.status}).`;
+}
+
+// Reads server-sent events from a fetch response (EventSource can't send a POST body).
+async function readEvents(res, onEvent) {
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) return;
+    buffer += decoder.decode(value, { stream: true });
+    let end;
+    while ((end = buffer.indexOf("\n\n")) !== -1) {
+      const block = buffer.slice(0, end);
+      buffer = buffer.slice(end + 2);
+      let event = "message";
+      let data = "";
+      for (const line of block.split("\n")) {
+        if (line.startsWith("event: ")) event = line.slice(7);
+        else if (line.startsWith("data: ")) data += line.slice(6);
+      }
+      onEvent(event, JSON.parse(data));
+    }
+  }
+}
+
+const nearBottom = () => window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 120;
+const scrollToEnd = () => window.scrollTo(0, document.documentElement.scrollHeight);
+
+function setBusy(value) {
+  busy = value;
+  sendButton.disabled = value;
+  log.setAttribute("aria-busy", String(value));  // screen readers announce the finished answer
+}
+
+function autosize() {
+  input.style.height = "auto";
+  input.style.height = `${Math.min(input.scrollHeight, 160)}px`;
+  input.style.overflowY = input.scrollHeight > 160 ? "auto" : "hidden";  // scrollbar only once it's full
+}
+
+async function ask(question) {
+  setBusy(true);
+  welcome.hidden = true;
+  input.value = "";
+  autosize();
+  addUserMessage(question);
+  const el = addBotMessage();
+  scrollToEnd();
+
+  let sources = [];
+  let text = "";
+  let finished = false;
+  try {
+    const res = await fetch("/ask/stream", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question }),
+    });
+    if (!res.ok) throw new Error(await errorMessage(res));
+    await readEvents(res, (event, data) => {
+      const stick = nearBottom();
+      if (event === "sources") {
+        sources = data;
+        showSources(el, sources);
+        el.querySelector(".answer").innerHTML = render("", 0);
+      } else if (event === "token") {
+        text += data.text;
+        el.querySelector(".answer").innerHTML = render(text, sources.length);
+      } else if (event === "done") {
+        finish(el, data, sources.length);
+        finished = true;
+      } else if (event === "error") {
+        throw new Error(data.detail);
+      }
+      if (stick) scrollToEnd();
+    });
+    if (!finished) throw new Error("The answer was cut off. Please try again.");
+  } catch (err) {
+    showError(el, err.message || "Something went wrong. Please try again.");
+  } finally {
+    setBusy(false);
+    input.focus();
+  }
+}
+
+form.addEventListener("submit", (e) => {
+  e.preventDefault();
+  const question = input.value.trim();
+  if (question && !busy) ask(question);
+});
+
+input.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+    e.preventDefault();
+    form.requestSubmit();
+  }
+});
+input.addEventListener("input", autosize);
+
+welcome.addEventListener("click", (e) => {
+  const example = e.target.closest(".example");
+  if (example && !busy) ask(example.textContent);
+});
+
+// A citation chip opens its source and briefly highlights it.
+log.addEventListener("click", (e) => {
+  const chip = e.target.closest(".cite");
+  if (!chip) return;
+  const item = chip.closest(".msg").querySelector(`.sources li[data-n="${chip.dataset.n}"]`);
+  if (!item) return;
+  item.querySelector("details").open = true;
+  item.scrollIntoView({ block: "nearest", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  item.classList.remove("flash");
+  void item.offsetWidth;  // restart the animation
+  item.classList.add("flash");
+});
+
+input.focus();
+</script>
+</body>
+</html>

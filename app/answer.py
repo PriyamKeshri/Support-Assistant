@@ -1,7 +1,8 @@
 """Answers a question from retrieved policy excerpts, with numbered citations."""
 import re
 import time
-from dataclasses import dataclass, field
+from collections.abc import Iterator
+from dataclasses import dataclass
 from functools import lru_cache
 
 from openai import OpenAI
@@ -22,18 +23,22 @@ Rules:
 - Never invent policy details, numbers, contacts or links."""
 
 THINK_BLOCK = re.compile(r"<think>.*?</think>", re.DOTALL)
-CITATION = re.compile(r"\[(\d+)\]")
+CITATION = re.compile(r"\[(\d+(?:\s*,\s*\d+)*)\]")  # [2], or [1, 3]
 
 
 @dataclass
 class Answer:
     text: str
-    citations: list[Hit]
+    cited: list[int]    # excerpt numbers the answer cites, as in its [n] markers
+    context: list[Hit]  # the excerpts the model was given, numbered from 1
     abstained: bool
     generation_ms: float
     prompt_tokens: int = 0
     completion_tokens: int = 0
-    context: list[Hit] = field(default_factory=list)
+
+    @property
+    def citations(self) -> list[Hit]:
+        return [self.context[n - 1] for n in self.cited]
 
     def cost_usd(self, settings: Settings) -> float:
         return (self.prompt_tokens * settings.llm_input_price_per_mtok
@@ -57,27 +62,61 @@ def format_context(hits: list[Hit]) -> str:
     )
 
 
+def build_messages(question: str, hits: list[Hit]) -> list[dict]:
+    return [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": f"Policy excerpts:\n\n{format_context(hits)}\n\nQuestion: {question}"},
+    ]
+
+
+def finish_answer(raw_text: str, hits: list[Hit], generation_ms: float, usage) -> Answer:
+    """Turns the model's raw reply into an Answer: drops reasoning blocks and collects the
+    citations that point at a real excerpt."""
+    text = THINK_BLOCK.sub("", raw_text).strip()
+    return Answer(
+        text=text,
+        cited=sorted({int(n) for group in CITATION.findall(text) for n in group.split(",")
+                      if 1 <= int(n) <= len(hits)}),
+        context=hits,
+        abstained=is_abstention(text),
+        generation_ms=generation_ms,
+        prompt_tokens=usage.prompt_tokens if usage else 0,
+        completion_tokens=usage.completion_tokens if usage else 0,
+    )
+
+
 def generate_answer(question: str, hits: list[Hit], settings: Settings) -> Answer:
     client = get_client(settings.llm_base_url, settings.llm_api_key)
     start = time.perf_counter()
     response = client.chat.completions.create(
-        model=settings.llm_model,
-        temperature=0,
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": f"Policy excerpts:\n\n{format_context(hits)}\n\nQuestion: {question}"},
-        ],
-    )
+        model=settings.llm_model, temperature=0, messages=build_messages(question, hits))
     elapsed = (time.perf_counter() - start) * 1000
-    text = THINK_BLOCK.sub("", response.choices[0].message.content or "").strip()
-    cited = sorted({int(n) for n in CITATION.findall(text) if 1 <= int(n) <= len(hits)})
-    usage = response.usage
-    return Answer(
-        text=text,
-        citations=[hits[n - 1] for n in cited],
-        abstained=is_abstention(text),
-        generation_ms=elapsed,
-        prompt_tokens=usage.prompt_tokens if usage else 0,
-        completion_tokens=usage.completion_tokens if usage else 0,
-        context=hits,
-    )
+    return finish_answer(response.choices[0].message.content or "", hits, elapsed, response.usage)
+
+
+class AnswerStream:
+    """Iterating yields the answer text as the model writes it. Once iteration ends,
+    `answer` holds the finished Answer, built exactly as generate_answer builds it."""
+
+    def __init__(self, question: str, hits: list[Hit], settings: Settings):
+        self.question, self.hits, self.settings = question, hits, settings
+        self.answer: Answer | None = None
+
+    def __iter__(self) -> Iterator[str]:
+        client = get_client(self.settings.llm_base_url, self.settings.llm_api_key)
+        start = time.perf_counter()
+        chunks = client.chat.completions.create(
+            model=self.settings.llm_model,
+            temperature=0,
+            messages=build_messages(self.question, self.hits),
+            stream=True,
+            stream_options={"include_usage": True},  # token counts arrive with the last chunk
+        )
+        parts, usage = [], None
+        for chunk in chunks:
+            usage = chunk.usage or usage
+            delta = chunk.choices[0].delta.content if chunk.choices else None
+            if delta:
+                parts.append(delta)
+                yield delta
+        self.answer = finish_answer("".join(parts), self.hits, (time.perf_counter() - start) * 1000, usage)
