@@ -8,6 +8,33 @@ Later phases add the agent itself: tools for looking up and changing tickets, se
 
 ![The chat page: a cited answer with its policy excerpt open, and a question the policies don't cover](docs/chat.jpg)
 
+## Tech stack
+
+| Layer | Choice | Why |
+|---|---|---|
+| Language | Python 3.11+ | The embedding, reranking and LLM libraries are Python-first, so the API, ingestion and evals share one codebase. |
+| API | FastAPI on Uvicorn, Pydantic | Requests are validated from type hints, the interactive docs at `/docs` come for free, and streaming responses power the chat page. |
+| Database | PostgreSQL 17 | Holds both search indexes in one table, so keyword and vector results are fused in a single SQL query. Phase 2's tickets will live here too. |
+| Vector search | pgvector, HNSW index | Nearest-neighbour search inside Postgres, with no separate vector database to run. HNSW keeps queries fast as the corpus grows. |
+| Keyword search | Postgres full-text search (`tsvector`, GIN index, `ts_rank_cd`) | Built into Postgres, and catches exact terms such as error codes, which embeddings can miss. |
+| Embeddings | `BAAI/bge-small-en-v1.5`, run locally | Good retrieval quality for a small model, and fast on a laptop. No per-query cost, so the evals can run as often as needed without an API key. |
+| Reranker | `cross-encoder/ms-marco-MiniLM-L-6-v2` | Reads the question and passage together, which judges relevance more precisely than comparing embeddings. Small enough to rerank 30 candidates in about 80 ms, and it lifted Hit@1 from 0.80 to 0.89. |
+| LLM | Any OpenAI-compatible endpoint; `llama3.1:8b` via Ollama for development | One client works with OpenAI, Azure OpenAI, Groq or a local model, so changing models is a config change. A local model keeps development free and the documents private. |
+| PDF parsing | pypdf | Pure Python with a permissive licence (PyMuPDF is AGPL), and enough for text-based PDFs. Scanned PDFs need OCR, planned for phase 3. |
+| Database access | psycopg 3, psycopg-pool, hand-written SQL | The search queries are the interesting part (reciprocal rank fusion, OR-style full-text queries), so they stay visible as SQL rather than hidden behind an ORM. |
+| Chat page | One HTML file, plain JavaScript | No framework or build step for a single page. Answers stream in as server-sent events. |
+| Evaluation | Own harness: Hit@k, Recall@k, MRR, nDCG, LLM judge | Each metric is a few lines of code, so it's clear exactly what every number means. Labels are per section, so they survive changes to chunking. |
+| Tests | pytest, with a fake LLM | Unit tests need nothing running, integration tests use the real Postgres, and a fake model makes the streaming and citation tests repeatable. |
+| Config | pydantic-settings | Typed settings from environment variables or `.env`; switching model or database needs no code changes. |
+| Delivery | Docker, Docker Compose, GitHub Actions, GitHub Packages | The same environment everywhere, one command to start Postgres, and every push to `main` publishes the API image. |
+
+Choices worth explaining:
+
+- **Postgres + pgvector instead of a vector database such as Chroma or Pinecone.** Keyword search, vectors and, from phase 2, tickets all live in one system with one backup and real transactions, and hybrid fusion is a single query. A dedicated vector database earns its place at hundreds of millions of vectors; this corpus is nowhere near that.
+- **Reciprocal rank fusion instead of blending scores.** Full-text and cosine scores are on different scales, and RRF needs only ranks. The trade-off shows in the results: with equal weights, a weak keyword match can pull a wrong section up, and the reranker has to fix it.
+- **Local models instead of a hosted API.** Free, private and repeatable for development and evals. The cost is speed and reasoning: answers take about 8 seconds on a laptop and an 8B model makes reasoning slips. Moving to Azure OpenAI should only need config changes; it's planned for phase 4.
+- **No LangChain in phase 1.** The pipeline is four steps (parse, retrieve, rerank, answer), and writing them directly keeps every query and prompt visible and testable. LangGraph comes in phase 2, where a stateful agent with tools and approval steps actually needs it.
+
 ## Results
 
 Retrieval over 78 labelled questions (59 chunks from 9 policies), on an Apple M4 laptop. From `python -m evals.retrieval`; per-question detail in [`evals/results/retrieval.json`](evals/results/retrieval.json).
