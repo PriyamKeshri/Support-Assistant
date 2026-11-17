@@ -21,7 +21,9 @@
     --notice-border: #f0d68f;
     --error-bg: #fdecec;
     --error-border: #f2b8b8;
+    --ok: #1e7a46;
     --highlight: #fff1a8;
+    --p1: #b42318; --p2: #b54708; --p3: #1f3f99; --p4: #586174;
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -38,18 +40,21 @@
       --notice-border: #6b5a1f;
       --error-bg: #3a1d1d;
       --error-border: #6e3434;
+      --ok: #6fcf97;
       --highlight: #4d4520;
+      --p1: #ff8a80; --p2: #ffb86b; --p3: #9fb6ff; --p4: #9aa3b2;
     }
   }
 
   * { box-sizing: border-box; }
+  html { scroll-padding-bottom: 130px; }  /* keep focused or revealed items above the sticky composer */
   body {
     margin: 0;
     background: var(--bg);
     color: var(--text);
     font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   }
-  button, textarea { font: inherit; color: inherit; }
+  button, textarea, input, select { font: inherit; color: inherit; }
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .visually-hidden {
     position: absolute; width: 1px; height: 1px; overflow: hidden;
@@ -63,11 +68,29 @@
   .logo { flex: none; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 9px; background: var(--accent); color: var(--on-accent); font-weight: 700; }
   .top h1 { margin: 0; font-size: 17px; }
   .status { margin: 1px 0 0; color: var(--muted); font-size: 13px; }
-  .docs-link { flex: none; color: var(--muted); font-size: 13px; }
+  .top nav { display: flex; flex: none; gap: 6px; }
+  .ghost {
+    padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface);
+    color: var(--text); font-size: 13px; text-decoration: none; cursor: pointer;
+  }
+  .ghost:hover { border-color: var(--accent); }
+  .ghost[aria-expanded="true"] { border-color: var(--accent); color: var(--accent); }
+
+  .tickets { margin-top: 12px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+  .tickets h2 { margin: 0 0 8px; font-size: 14px; }
+  .tickets ul { margin: 0; padding: 0; list-style: none; }
+  .tickets li { display: flex; align-items: baseline; gap: 10px; padding: 5px 0; border-top: 1px solid var(--border); font-size: 14px; }
+  .tickets li:first-child { border-top: 0; }
+  .tickets .num { flex: none; font-variant-numeric: tabular-nums; color: var(--muted); }
+  .tickets .title { flex: 1; min-width: 0; }
+  .tickets .state { flex: none; color: var(--muted); font-size: 13px; }
+  .tickets .empty { color: var(--muted); }
+  .badge { flex: none; padding: 0 6px; border: 1px solid currentColor; border-radius: 6px; font-size: 11px; font-weight: 700; line-height: 18px; }
+  .badge.P1 { color: var(--p1); } .badge.P2 { color: var(--p2); } .badge.P3 { color: var(--p3); } .badge.P4 { color: var(--p4); }
 
   main { flex: 1; padding: 20px 0 8px; }
 
-  .welcome { margin: 6vh 0 24px; }
+  .welcome { margin: 5vh 0 24px; }
   .welcome h2 { margin: 0 0 6px; font-size: 22px; }
   .welcome p { margin: 0 0 18px; color: var(--muted); }
   .examples { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
@@ -84,14 +107,21 @@
     background: var(--accent); color: var(--on-accent); white-space: pre-wrap; overflow-wrap: anywhere;
   }
   .msg.bot { padding: 14px 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
-  .msg.bot.abstained { background: var(--notice-bg); border-color: var(--notice-border); }
   .msg.bot.error { background: var(--error-bg); border-color: var(--error-border); }
 
+  .steps { margin: 0 0 10px; padding: 0; list-style: none; font-size: 13px; color: var(--muted); }
+  .steps:empty { display: none; }
+  .steps li { position: relative; padding-left: 18px; }
+  .steps li::before { content: ""; position: absolute; left: 4px; top: 0.55em; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+  .steps li.declined::before { background: var(--muted); }
+  .steps li.error::before { background: var(--p1); }
+
   .answer { overflow-wrap: anywhere; }
+  .answer:empty { display: none; }
   .answer p { margin: 0 0 8px; }
   .answer p:last-child { margin-bottom: 0; }
   .answer ul, .answer ol { margin: 0 0 8px; padding-left: 22px; }
-  .working { color: var(--muted); }
+  .working { margin: 0; color: var(--muted); }
   .dots::after { content: ""; animation: dots 1.2s steps(4) infinite; }
   @keyframes dots { 0% { content: ""; } 25% { content: "."; } 50% { content: ".."; } 75% { content: "..."; } }
 
@@ -100,6 +130,26 @@
     border: 0; border-radius: 9px; background: var(--cite-bg); color: var(--cite-text);
     font-size: 11px; font-weight: 600; line-height: 18px; cursor: pointer;
   }
+
+  .approval { margin-top: 4px; padding: 12px 14px; border: 1px solid var(--notice-border); border-radius: 10px; background: var(--notice-bg); }
+  .approval h3 { margin: 0 0 8px; font-size: 14px; }
+  .action + .action { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--notice-border); }
+  .action .summary { margin: 0 0 8px; font-weight: 600; }
+  .action .detail { margin: 0 0 8px; color: var(--muted); font-size: 13px; }
+  .fields { display: flex; flex-wrap: wrap; gap: 8px 12px; }
+  .fields label { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--muted); }
+  .fields label.wide { flex: 1 1 100%; }
+  .fields input, .fields select {
+    min-width: 0; padding: 5px 8px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); font-size: 14px;
+  }
+  .approval-buttons { display: flex; gap: 8px; margin-top: 12px; }
+  .approve, .reject { padding: 7px 16px; border-radius: 9px; font-weight: 600; cursor: pointer; }
+  .approve { border: 0; background: var(--accent); color: var(--on-accent); }
+  .reject { border: 1px solid var(--border); background: var(--surface); }
+  .approval.settled .fields, .approval.settled .approval-buttons { display: none; }
+  .approval-result { margin: 8px 0 0; font-weight: 600; }
+  .approval-result.approved { color: var(--ok); }
+  .approval-result.rejected, .approval-result.cancelled { color: var(--muted); }
 
   .sources { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
   .sources h3 { margin: 0 0 6px; color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
@@ -140,7 +190,8 @@
   @media (max-width: 560px) {
     .examples { grid-template-columns: 1fr; }
     .msg.user { max-width: 92%; }
-    .sources .page { display: none; }
+    .sources .page, .tickets .state { display: none; }
+    .top { flex-wrap: wrap; }
   }
   @media (prefers-reduced-motion: reduce) {
     .dots::after { animation: none; content: "..."; }
@@ -158,68 +209,86 @@
         <p class="status" id="status">Connecting…</p>
       </div>
     </div>
-    <a class="docs-link" href="/docs">API docs</a>
+    <nav aria-label="Help desk">
+      <button class="ghost" id="tickets-toggle" type="button" aria-expanded="false" aria-controls="tickets-panel">My tickets</button>
+      <button class="ghost" id="new-chat" type="button">New chat</button>
+      <a class="ghost" href="/docs">API</a>
+    </nav>
   </header>
+
+  <section class="tickets" id="tickets-panel" hidden>
+    <h2>My tickets</h2>
+    <ul id="tickets-list"></ul>
+  </section>
 
   <main>
     <section class="welcome" id="welcome">
-      <h2>Ask about the IT policies</h2>
-      <p>Answers come only from Kestrel's IT policies, and show the sections they're based on. Kestrel Analytics is a fictional company.</p>
+      <h2>How can I help?</h2>
+      <p>Ask about Kestrel's IT policies, check on your tickets, or report a problem. I'll ask before creating or changing anything. Kestrel Analytics is a fictional company.</p>
       <div class="examples">
-        <button type="button" class="example">I lost my laptop at the airport. What should I do?</button>
-        <button type="button" class="example">What does error VPN-809 mean?</button>
-        <button type="button" class="example">Can I paste customer data into ChatGPT?</button>
-        <button type="button" class="example">How do I get admin rights on my Mac?</button>
+        <button type="button" class="example">My laptop was stolen from my car this morning.</button>
+        <button type="button" class="example">What's the status of my tickets?</button>
+        <button type="button" class="example">My VPN says VPN-809. What should I do?</button>
+        <button type="button" class="example">Please close INC-1002, I don't need it anymore.</button>
       </div>
     </section>
     <div class="log" id="log" role="log" aria-live="polite" aria-label="Conversation"></div>
   </main>
 
   <form class="composer" id="composer">
-    <label class="visually-hidden" for="question">Your question</label>
+    <label class="visually-hidden" for="question">Your message</label>
     <div class="input-row">
-      <textarea id="question" rows="1" maxlength="500" placeholder="Ask about the IT policies…" required></textarea>
+      <textarea id="question" rows="1" maxlength="1000" placeholder="Ask or report a problem…" required></textarea>
       <button class="send" id="send" type="submit">Send</button>
     </div>
-    <p class="hint">Each question is answered on its own, so follow-ups don't see earlier messages yet. Enter sends; Shift+Enter adds a line.</p>
+    <p class="hint" id="hint">I remember this conversation and ask for your approval before creating or changing a ticket. Enter sends; Shift+Enter adds a line.</p>
   </form>
 </div>
 
 <script>
+const CATEGORIES = ["Account and Password", "Access Request", "Hardware", "Software", "Network/VPN",
+                    "Email and Collaboration", "Security Incident"];
+const PRIORITIES = ["P1", "P2", "P3", "P4"];
+
 const log = document.getElementById("log");
 const form = document.getElementById("composer");
 const input = document.getElementById("question");
 const sendButton = document.getElementById("send");
 const welcome = document.getElementById("welcome");
+const ticketsToggle = document.getElementById("tickets-toggle");
+const ticketsPanel = document.getElementById("tickets-panel");
+
+let thread = crypto.randomUUID();
+let sources = new Map();  // every policy excerpt found in this conversation, by its [n]
 let busy = false;
 
 fetch("/health")
   .then((res) => res.json())
   .then((h) => {
-    document.getElementById("status").textContent =
-      `${h.documents} policies · ${h.chunks} sections indexed · ` +
-      (h.llm_model ? `model: ${h.llm_model}` : "no model configured, so answers are unavailable");
+    const who = h.user ? `Signed in as ${h.user.name} (demo)` : "";
+    const model = h.agent_model ? `model ${h.agent_model}` : "no model configured";
+    document.getElementById("status").textContent = [who, model, `${h.documents} policies`].filter(Boolean).join(" · ");
   })
   .catch(() => { document.getElementById("status").textContent = "Can't reach the API"; });
 
 const escapeHtml = (s) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const seconds = (ms) => `${(ms / 1000).toFixed(1)} s`;
 
-// [2] or [1, 3] become buttons that open the matching source. Numbers with no source stay as text.
-function inline(s, sourceCount) {
+// [2] or [1, 3] become buttons that open the matching source. Unknown numbers stay as text.
+function inline(s) {
   return s
     .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
     .replace(/\[(\d+(?:\s*,\s*\d+)*)\]/g, (match, group) => {
       const numbers = group.split(",").map((n) => Number(n.trim()));
-      if (numbers.some((n) => n < 1 || n > sourceCount)) return match;
+      if (!numbers.every((n) => sources.has(n))) return match;
       return numbers.map((n) => `<button type="button" class="cite" data-n="${n}" aria-label="Show source ${n}">${n}</button>`).join("");
     });
 }
 
-// Just enough Markdown for help-desk answers: paragraphs, bullet and numbered lists, bold.
-function render(text, sourceCount) {
+// Just enough Markdown for help-desk replies: paragraphs, bullet and numbered lists, bold.
+function render(text) {
   const visible = text.replace(/<think>[\s\S]*?(?:<\/think>|$)/g, "").trim();  // reasoning models think first
-  if (!visible) return '<p class="working">Writing the answer<span class="dots"></span></p>';
+  if (!visible) return "";
   let html = "";
   let list = null;
   for (const line of escapeHtml(visible).split("\n").map((l) => l.trim())) {
@@ -230,10 +299,27 @@ function render(text, sourceCount) {
       if (kind) html += `<${kind}>`;
       list = kind;
     }
-    if (item) html += `<li>${inline(item[2], sourceCount)}</li>`;
-    else if (line) html += `<p>${inline(line, sourceCount)}</p>`;
+    if (item) html += `<li>${inline(item[2])}</li>`;
+    else if (line) html += `<p>${inline(line)}</p>`;
   }
   return list ? html + `</${list}>` : html;
+}
+
+function stepLabel(e) {
+  const a = e.args || {};
+  const failed = e.status === "error" ? " (failed)" : "";
+  switch (e.name) {
+    case "search_policies": return `Searched the policies for “${a.query}”${failed}`;
+    case "list_my_tickets": return `Looked up your ${a.status ? a.status.toLowerCase() + " " : ""}tickets${failed}`;
+    case "get_ticket": return e.status === "error" ? `Couldn't find ${a.number}` : `Opened ${a.number}`;
+    case "create_ticket":
+      if (e.status === "declined") return "Ticket not created: not approved";
+      return e.status === "done" ? `Created a ${a.priority} ${a.category} ticket` : "Couldn't create the ticket";
+    case "update_ticket":
+      if (e.status === "declined") return `${a.number} not changed: not approved`;
+      return e.status === "done" ? `Updated ${a.number}` : `Couldn't update ${a.number}`;
+    default: return `Ran ${e.name}${failed}`;
+  }
 }
 
 function addUserMessage(text) {
@@ -246,20 +332,30 @@ function addUserMessage(text) {
   log.append(el);
 }
 
-function addBotMessage() {
+function addBotMessage(working) {
   const el = document.createElement("article");
   el.className = "msg bot";
   el.innerHTML = `
-    <div class="answer"><p class="working">Searching the policies<span class="dots"></span></p></div>
-    <section class="sources" hidden><h3>Searched</h3><ol></ol></section>
+    <ol class="steps"></ol>
+    <div class="answer"><p class="working">${working}<span class="dots"></span></p></div>
+    <section class="sources" hidden><h3>Sources</h3><ol></ol></section>
     <p class="meta" hidden></p>`;
   log.append(el);
   return el;
 }
 
-function showSources(el, sources) {
-  const list = el.querySelector(".sources ol");
-  for (const s of sources) {
+function addStep(el, event) {
+  const li = document.createElement("li");
+  li.className = event.status;
+  li.textContent = stepLabel(event);
+  el.querySelector(".steps").append(li);
+}
+
+function showSources(el, cited) {
+  const box = el.querySelector(".sources");
+  const list = box.querySelector("ol");
+  list.replaceChildren();
+  for (const s of cited) {
     const li = document.createElement("li");
     li.dataset.n = s.n;
     li.innerHTML = '<details><summary><span class="num"></span><span class="where"></span><span class="page"></span></summary><p class="excerpt"></p></details>';
@@ -269,29 +365,93 @@ function showSources(el, sources) {
     li.querySelector(".excerpt").textContent = s.content;
     list.append(li);
   }
-  el.querySelector(".sources").hidden = false;
+  box.hidden = cited.length === 0;
 }
 
-function finish(el, done, sourceCount) {
-  el.querySelector(".answer").innerHTML = render(done.answer, sourceCount);
-  const box = el.querySelector(".sources");
-  if (done.abstained) {
-    el.classList.add("abstained");
-    box.hidden = true;
-  } else if (done.cited.length) {
-    // Keep only the sections the answer actually relies on.
-    box.querySelector("h3").textContent = "Sources";
-    for (const li of box.querySelectorAll("li")) {
-      if (!done.cited.includes(Number(li.dataset.n))) li.remove();
-    }
-  } else {
-    box.querySelector("h3").textContent = "Sections searched";
+function option(value, label, selected) {
+  return `<option value="${escapeHtml(value)}"${selected ? " selected" : ""}>${escapeHtml(label)}</option>`;
+}
+
+// The proposed action, with the fields the employee may change before approving.
+function actionFields(action) {
+  const a = action.args;
+  if (action.tool === "create_ticket") {
+    return `
+      <label class="wide">Title<input name="title" maxlength="120" value="${escapeHtml(a.title || "")}"></label>
+      <label>Category<select name="category">${CATEGORIES.map((c) => option(c, c, c === a.category)).join("")}</select></label>
+      <label>Priority<select name="priority">${PRIORITIES.map((p) => option(p, p, p === a.priority)).join("")}</select></label>`;
   }
-  const parts = [`Search ${seconds(done.retrieval_ms)}`, `answer ${seconds(done.generation_ms)}`];
-  if (done.prompt_tokens) parts.push(`${done.prompt_tokens} + ${done.completion_tokens} tokens`);
-  if (done.cost_usd > 0) parts.push(`$${done.cost_usd.toFixed(4)}`);
+  if (action.tool === "update_ticket") {
+    return `
+      <label>Status<select name="status">${option("", "No change", !a.status)}${["Open", "Closed"].map((s) => option(s, s, s === a.status)).join("")}</select></label>
+      <label>Priority<select name="priority">${option("", "No change", !a.priority)}${PRIORITIES.map((p) => option(p, p, p === a.priority)).join("")}</select></label>
+      <label class="wide">Comment<input name="comment" maxlength="500" value="${escapeHtml(a.comment || "")}"></label>`;
+  }
+  return "";
+}
+
+function showApproval(el, actions) {
+  const card = document.createElement("div");
+  card.className = "approval";
+  card.setAttribute("role", "group");
+  card.setAttribute("aria-label", "Approval needed");
+  card.dataset.ids = actions.map((a) => a.id).join(" ");
+  card.innerHTML = `<h3>${actions.length > 1 ? "Approve these changes?" : "Approve this change?"}</h3>` +
+    actions.map((a) => `
+      <div class="action" data-id="${escapeHtml(a.id)}">
+        <p class="summary"></p>
+        ${a.args.description ? '<p class="detail"></p>' : ""}
+        <div class="fields">${actionFields(a)}</div>
+      </div>`).join("") + `
+    <div class="approval-buttons">
+      <button type="button" class="approve">Approve</button>
+      <button type="button" class="reject">Reject</button>
+    </div>
+    <p class="approval-result" hidden></p>`;
+  actions.forEach((a, i) => {
+    const node = card.querySelectorAll(".action")[i];
+    node.querySelector(".summary").textContent = a.summary;
+    if (a.args.description) node.querySelector(".detail").textContent = a.args.description;
+  });
+  card.querySelector(".approve").addEventListener("click", () => decide(card, actions, "approve"));
+  card.querySelector(".reject").addEventListener("click", () => decide(card, actions, "reject"));
+  el.querySelector(".answer").after(card);
+  card.querySelector(".approve").focus({ preventScroll: true });
+  scrollToEnd();
+}
+
+function settle(card, result, label) {
+  card.classList.add("settled");
+  const p = card.querySelector(".approval-result");
+  p.className = `approval-result ${result}`;
+  p.textContent = label;
+  p.hidden = false;
+}
+
+function decide(card, actions, choice) {
+  if (busy || card.classList.contains("settled")) return;
+  const decisions = actions.map((a) => {
+    const args = {};
+    if (choice === "approve") {
+      for (const field of card.querySelectorAll(`.action[data-id="${CSS.escape(a.id)}"] [name]`)) {
+        const value = field.value.trim();
+        if (value !== (a.args[field.name] || "")) args[field.name] = value || null;
+      }
+    }
+    return { id: a.id, action: choice, args };
+  });
+  settle(card, choice === "approve" ? "approved" : "rejected", choice === "approve" ? "Approved" : "Rejected: nothing was changed");
+  stream("/chat/resume", { thread_id: thread, decisions }, "Carrying on");
+}
+
+function finish(el, done) {
+  el.querySelector(".answer").innerHTML = render(done.answer) || '<p class="working">Done.</p>';
+  showSources(el, done.sources || []);
+  const tokens = done.prompt_tokens + done.completion_tokens;
   const meta = el.querySelector(".meta");
-  meta.textContent = parts.join(" · ");
+  meta.textContent = [seconds(done.ms), `${done.model_calls} model call${done.model_calls === 1 ? "" : "s"}`,
+                      `${done.tool_calls} tool call${done.tool_calls === 1 ? "" : "s"}`, tokens ? `${tokens} tokens` : ""]
+    .filter(Boolean).join(" · ");
   meta.hidden = false;
 }
 
@@ -340,64 +500,102 @@ const scrollToEnd = () => window.scrollTo(0, document.documentElement.scrollHeig
 function setBusy(value) {
   busy = value;
   sendButton.disabled = value;
-  log.setAttribute("aria-busy", String(value));  // screen readers announce the finished answer
+  log.setAttribute("aria-busy", String(value));  // screen readers announce the finished reply
 }
 
 function autosize() {
   input.style.height = "auto";
   input.style.height = `${Math.min(input.scrollHeight, 160)}px`;
-  input.style.overflowY = input.scrollHeight > 160 ? "auto" : "hidden";  // scrollbar only once it's full
+  input.style.overflowY = input.scrollHeight > 160 ? "auto" : "hidden";
 }
 
-async function ask(question) {
+// Sends a message or a decision, and shows the agent's work as it streams in.
+async function stream(path, body, working) {
   setBusy(true);
-  welcome.hidden = true;
-  input.value = "";
-  autosize();
-  addUserMessage(question);
-  const el = addBotMessage();
+  const el = addBotMessage(working);
   scrollToEnd();
-
-  let sources = [];
   let text = "";
-  let finished = false;
+  let ended = false;
+  let changedTickets = false;
   try {
-    const res = await fetch("/ask/stream", {
+    const res = await fetch(path, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question }),
+      body: JSON.stringify(body),
     });
     if (!res.ok) throw new Error(await errorMessage(res));
     await readEvents(res, (event, data) => {
       const stick = nearBottom();
-      if (event === "sources") {
-        sources = data;
-        showSources(el, sources);
-        el.querySelector(".answer").innerHTML = render("", 0);
+      if (event === "cancelled") {
+        for (const card of log.querySelectorAll(".approval:not(.settled)")) settle(card, "cancelled", "Cancelled: you sent a new message");
       } else if (event === "token") {
         text += data.text;
-        el.querySelector(".answer").innerHTML = render(text, sources.length);
+        el.querySelector(".answer").innerHTML = render(text);
+      } else if (event === "retract") {
+        // The reply cited policies that were never looked up; the agent is searching and answering again.
+        text = "";
+        el.querySelector(".answer").innerHTML = '<p class="working">Checking the policies<span class="dots"></span></p>';
+      } else if (event === "tool") {
+        addStep(el, data);
+        if (data.status === "done" && /^(create|update)_ticket$/.test(data.name)) changedTickets = true;
+        if (!text) el.querySelector(".answer").innerHTML = '<p class="working">Working<span class="dots"></span></p>';
+      } else if (event === "sources") {
+        for (const s of data.items) sources.set(s.n, s);
+      } else if (event === "approval") {
+        el.querySelector(".answer").innerHTML = render(text);
+        showApproval(el, data.actions);
+        ended = true;
       } else if (event === "done") {
-        finish(el, data, sources.length);
-        finished = true;
+        finish(el, data);
+        ended = true;
       } else if (event === "error") {
         throw new Error(data.detail);
       }
       if (stick) scrollToEnd();
     });
-    if (!finished) throw new Error("The answer was cut off. Please try again.");
+    if (!ended) throw new Error("The reply was cut off. Please try again.");
   } catch (err) {
     showError(el, err.message || "Something went wrong. Please try again.");
   } finally {
     setBusy(false);
-    input.focus();
+    if (changedTickets) refreshTickets();
+    if (!el.querySelector(".approval")) input.focus();
+  }
+}
+
+function send(message) {
+  welcome.hidden = true;
+  input.value = "";
+  autosize();
+  addUserMessage(message);
+  stream("/chat", { thread_id: thread, message }, "Thinking");
+}
+
+async function refreshTickets() {
+  if (ticketsPanel.hidden) return;
+  const list = document.getElementById("tickets-list");
+  try {
+    const { tickets } = await (await fetch("/tickets")).json();
+    list.replaceChildren(...tickets.map((t) => {
+      const li = document.createElement("li");
+      li.innerHTML = '<span class="num"></span><span class="title"></span><span class="badge"></span><span class="state"></span>';
+      li.querySelector(".num").textContent = t.number;
+      li.querySelector(".title").textContent = t.title;
+      li.querySelector(".badge").textContent = t.priority;
+      li.querySelector(".badge").classList.add(t.priority);
+      li.querySelector(".state").textContent = t.status;
+      return li;
+    }));
+    if (!tickets.length) list.innerHTML = '<li class="empty">No tickets yet.</li>';
+  } catch {
+    list.innerHTML = '<li class="empty">Couldn\'t load your tickets.</li>';
   }
 }
 
 form.addEventListener("submit", (e) => {
   e.preventDefault();
-  const question = input.value.trim();
-  if (question && !busy) ask(question);
+  const message = input.value.trim();
+  if (message && !busy) send(message);
 });
 
 input.addEventListener("keydown", (e) => {
@@ -410,7 +608,23 @@ input.addEventListener("input", autosize);
 
 welcome.addEventListener("click", (e) => {
   const example = e.target.closest(".example");
-  if (example && !busy) ask(example.textContent);
+  if (example && !busy) send(example.textContent);
+});
+
+ticketsToggle.addEventListener("click", () => {
+  const open = ticketsPanel.hidden;
+  ticketsPanel.hidden = !open;
+  ticketsToggle.setAttribute("aria-expanded", String(open));
+  refreshTickets();
+});
+
+document.getElementById("new-chat").addEventListener("click", () => {
+  if (busy) return;
+  thread = crypto.randomUUID();
+  sources = new Map();
+  log.replaceChildren();
+  welcome.hidden = false;
+  input.focus();
 });
 
 // A citation chip opens its source and briefly highlights it.

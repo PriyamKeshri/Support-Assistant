@@ -30,9 +30,22 @@ class Settings(BaseSettings):
     llm_input_price_per_mtok: float = 0.0   # USD per million tokens, for cost reporting
     llm_output_price_per_mtok: float = 0.0
 
+    # The agent's model needs to be good at tool calling; it defaults to llm_model.
+    agent_model: str = ""
+    # Sent as reasoning_effort when set. "none" switches off qwen3's thinking on Ollama.
+    agent_reasoning_effort: str = ""
+
+    # There is no sign-in yet, so the chat acts as this employee.
+    demo_user: str = "alex.rivera@kestrel.example"
+    demo_user_name: str = "Alex Rivera"
+
     @property
     def llm_configured(self) -> bool:
         return bool(self.llm_base_url and self.llm_model)
+
+    @property
+    def agent_llm(self) -> str:
+        return self.agent_model or self.llm_model
 
 
 @lru_cache

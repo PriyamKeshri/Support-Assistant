@@ -1,5 +1,4 @@
 """Runs against the real database. Start it and ingest first:  make db ingest"""
-import json
 from types import SimpleNamespace
 
 import psycopg
@@ -10,6 +9,7 @@ from app.config import Settings, get_settings
 from app.models import get_embedder, get_reranker
 from app.search import Mode, search
 from evals.metrics import load_questions
+from helpers import parse_events
 
 pytestmark = pytest.mark.integration
 
@@ -88,14 +88,6 @@ def api(conn):
             yield client
     finally:
         app.dependency_overrides.clear()
-
-
-def parse_events(body: str) -> list[tuple[str, object]]:
-    events = []
-    for block in body.strip().split("\n\n"):
-        fields = dict(line.split(": ", 1) for line in block.split("\n"))
-        events.append((fields["event"], json.loads(fields["data"])))
-    return events
 
 
 def test_chat_page_is_served(api):

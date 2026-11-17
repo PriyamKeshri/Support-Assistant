@@ -2,12 +2,17 @@ import json
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Any, Literal
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, StreamingResponse
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+from psycopg.rows import dict_row
 from pydantic import BaseModel, Field
-from psycopg_pool import ConnectionPool
+from psycopg_pool import AsyncConnectionPool, ConnectionPool
 
+from app import tickets
+from app.agent import open_agent, run_turn
 from app.answer import AnswerStream, generate_answer
 from app.config import Settings, get_settings
 from app.db import create_pool
@@ -22,17 +27,25 @@ CHAT_PAGE = Path(__file__).with_name("static") / "index.html"
 async def lifespan(app: FastAPI):
     settings = get_settings()
     app.state.pool = create_pool(settings.database_url)
-    # Load both models at startup so the first request doesn't pay for it.
-    get_embedder()
-    get_reranker()
-    yield
+    with app.state.pool.connection() as conn:
+        tickets.init_tickets(conn)
+    # The agent's conversations, including approvals that are still pending, live in Postgres.
+    async with AsyncConnectionPool(settings.database_url, open=False, max_size=5, kwargs={
+            "autocommit": True, "prepare_threshold": 0, "row_factory": dict_row}) as checkpoint_pool:
+        app.state.checkpointer = AsyncPostgresSaver(checkpoint_pool)
+        await app.state.checkpointer.setup()
+        # Load both models at startup so the first request doesn't pay for it.
+        get_embedder()
+        get_reranker()
+        yield
     app.state.pool.close()
 
 
 app = FastAPI(
     title="Agentic Support Assistant",
-    description="IT help desk assistant over company policy PDFs: hybrid search on Postgres + pgvector.",
-    version="0.1.0",
+    description="IT help desk agent over company policy PDFs and tickets: hybrid search on Postgres + pgvector, "
+                "tools over MCP, and human approval before any change.",
+    version="0.2.0",
     lifespan=lifespan,
 )
 
@@ -108,7 +121,9 @@ def health(pool: ConnectionPool = Depends(get_pool), settings: Settings = Depend
         documents, chunks = conn.execute(
             "SELECT (SELECT count(*) FROM documents), (SELECT count(*) FROM chunks)").fetchone()
     return {"status": "ok", "documents": documents, "chunks": chunks,
-            "llm_model": settings.llm_model if settings.llm_configured else None}
+            "llm_model": settings.llm_model if settings.llm_configured else None,
+            "agent_model": settings.agent_llm if settings.llm_configured else None,
+            "user": {"email": settings.demo_user, "name": settings.demo_user_name}}
 
 
 @app.post("/search")
@@ -177,3 +192,63 @@ def ask_stream_endpoint(body: AskRequest, pool: ConnectionPool = Depends(get_poo
         })
 
     return StreamingResponse(events(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"})
+
+
+ThreadId = Field(pattern=r"^[A-Za-z0-9-]{8,64}$", description="Conversation ID chosen by the client.")
+
+
+class ChatRequest(BaseModel):
+    thread_id: str = ThreadId
+    message: str = Field(min_length=1, max_length=1000, examples=["My laptop was stolen from my car this morning."])
+
+
+class Decision(BaseModel):
+    id: str = Field(description="The tool call ID from the approval event.")
+    action: Literal["approve", "reject"]
+    args: dict[str, Any] = Field(default={}, description="Edits to the proposed arguments, applied on approval.")
+
+
+class ResumeRequest(BaseModel):
+    thread_id: str = ThreadId
+    decisions: list[Decision] = Field(min_length=1)
+
+
+def agent_events(request: Request, settings: Settings, thread_id: str, **turn) -> StreamingResponse:
+    async def events():
+        try:
+            async with open_agent(settings, request.app.state.checkpointer) as graph:
+                async for event in run_turn(graph, thread_id, **turn):
+                    yield sse(event["type"], event)
+        except Exception as exc:  # the 200 status is already sent, so report the failure in the stream
+            log.exception("agent turn failed")
+            yield sse("error", {"type": "error", "detail": f"The assistant failed: {exc}"})
+
+    return StreamingResponse(events(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"})
+
+
+@app.post("/chat")
+def chat_endpoint(body: ChatRequest, request: Request, settings: Settings = Depends(get_settings)) -> StreamingResponse:
+    """Sends a message to the help desk agent and streams its work as server-sent events:
+    `token` (answer text), `tool` (each tool call), `sources` (numbered policy excerpts) and
+    `model` (each model call), ending in `approval` when an action needs the employee's
+    go-ahead, or `done`. `cancelled` comes first if a pending approval was dropped, and
+    `retract` means the answer so far cited policies that were never looked up, so the agent
+    is searching and answering again: clear the text received so far."""
+    require_llm(settings)
+    return agent_events(request, settings, body.thread_id, message=body.message)
+
+
+@app.post("/chat/resume")
+def chat_resume_endpoint(body: ResumeRequest, request: Request,
+                         settings: Settings = Depends(get_settings)) -> StreamingResponse:
+    """Continues a conversation that is waiting for approval, with the employee's decision on
+    each pending action. Streams the same events as /chat."""
+    require_llm(settings)
+    return agent_events(request, settings, body.thread_id, decisions=[d.model_dump() for d in body.decisions])
+
+
+@app.get("/tickets")
+def my_tickets(pool: ConnectionPool = Depends(get_pool), settings: Settings = Depends(get_settings)) -> dict:
+    """The signed-in employee's tickets (the demo user until there is sign-in)."""
+    with pool.connection() as conn:
+        return {"tickets": tickets.list_tickets(conn, settings.demo_user)}

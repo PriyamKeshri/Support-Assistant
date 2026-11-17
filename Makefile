@@ -1,6 +1,6 @@
 PY ?= .venv/bin/python
 
-.PHONY: setup db pdfs ingest api test eval eval-answers
+.PHONY: setup db pdfs ingest seed api test eval eval-answers eval-agent mcp
 
 setup:            ## create the virtualenv and install everything
 	python3 -m venv .venv && $(PY) -m pip install -e ".[dev]"
@@ -14,7 +14,10 @@ pdfs:             ## rebuild data/policies/*.pdf from the Markdown sources
 ingest:           ## parse, chunk, embed and store the policy PDFs
 	$(PY) -m app.ingest --reset
 
-api:              ## run the API at http://localhost:8000/docs
+seed:             ## reset the help desk tickets to the demo data
+	$(PY) -m app.tickets seed
+
+api:              ## the chat at http://localhost:8000 (API docs at /docs)
 	$(PY) -m uvicorn app.main:app --reload
 
 test:
@@ -25,3 +28,9 @@ eval:             ## compare the four retrieval modes
 
 eval-answers:     ## answer quality with an LLM judge (needs LLM_* in .env)
 	$(PY) -m evals.answers
+
+eval-agent:       ## scripted agent conversations: tools, approvals, outcomes
+	$(PY) -m evals.agent
+
+mcp:              ## the help desk tools as an MCP server over stdio
+	$(PY) -m app.mcp_server
